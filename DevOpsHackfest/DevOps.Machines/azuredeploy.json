@@ -1,0 +1,478 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Username for the Virtual Machine."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
+    },
+    "dnsNameForPublicIP": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Globally unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "windowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2016-Datacenter-with-Containers",
+      "allowedValues": [
+        "2008-R2-SP1",
+        "2012-Datacenter",
+        "2012-R2-Datacenter",
+        "2016-Nano-Server",
+        "2016-Datacenter-with-Containers",
+        "2016-Datacenter"
+      ],
+      "metadata": {
+        "description": "The Windows version for the VM. This will pick a fully patched image of this given Windows version. Allowed values: 2008-R2-SP1, 2012-Datacenter, 2012-R2-Datacenter."
+      }
+    },
+    "UbuntuAdminUserName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "UbuntuAdminPassword": {
+      "type": "securestring"
+    },
+    "UbuntuUbuntuOSVersion": {
+      "type": "string",
+      "defaultValue": "14.04.2-LTS",
+      "allowedValues": [
+        "12.04.5-LTS",
+        "14.04.2-LTS"
+      ]
+    },
+    "linPubIpDnsName": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "variables": {
+    "imagePublisher": "MicrosoftWindowsServer",
+    "imageOffer": "WindowsServer",
+    "OSDiskName": "osdiskforwindows",
+    "nicName": "myWinVMNic",
+    "addressPrefix": "10.0.0.0/16",
+    "subnetName": "Subnet",
+    "subnetPrefix": "10.0.0.0/24",
+    "vhdStorageType": "Standard_LRS",
+    "regStorageType": "Standard_LRS",
+    "publicIPAddressName": "myWinPublicIP",
+    "publicIPAddressType": "Dynamic",
+    "vhdStorageContainerName": "vhds",
+    "vmName": "Windows",
+    "vmSize": "Standard_D2_v2",
+    "virtualNetworkName": "MyVNET",
+    "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+    "subnetRef": "[concat(variables('vnetId'), '/subnets/', variables('subnetName'))]",
+    "vhdStorageAccountName": "[concat('vhdstorage', uniqueString(resourceGroup().id))]",
+    "regStorageAccountName": "[concat('regstorage', uniqueString(resourceGroup().id))]",
+    "numberOfWinInstances": 2,
+    "numberOfLinInstances": 2,
+    "UbuntuImagePublisher": "Canonical",
+    "UbuntuImageOffer": "UbuntuServer",
+    "UbuntuOSDiskName": "UbuntuOSDisk",
+    "UbuntuVmSize": "Standard_D2_v2",
+    "UbuntuVnetID": "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+    "UbuntuSubnetRef": "[concat(variables('UbuntuVnetID'), '/subnets/', variables('subnetName'))]",
+    "UbuntuStorageAccountContainerName": "vhds",
+    "UbuntuName": "Ubuntu",
+    "UbuntuNicName": "[concat(variables('UbuntuName'), 'NIC')]",
+    "linPubIpName": "linPubIp",
+    "windowsNSG": "windowsNSG",
+    "linuxNSG":  "linuxNSG"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[variables('vhdStorageAccountName')]",
+      "apiVersion": "2016-01-01",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VHDStorageAccount"
+      },
+      "sku": {
+        "name": "[variables('vhdStorageType')]"
+      },
+      "kind": "Storage"
+    },
+    {
+      "apiVersion": "2016-03-30",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[concat(variables('publicIPAddressName'), copyIndex())]",
+      "copy": {
+        "name": "ipLoop",
+        "count": "[variables('numberOfWinInstances')]"
+      },
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "PublicIPAddress"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[concat(parameters('dnsNameForPublicIP'), copyIndex())]"
+        }
+      }
+    },
+    {
+      "apiVersion": "2016-03-30",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[variables('virtualNetworkName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualNetwork"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('addressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('subnetPrefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2016-03-30",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(variables('nicName'), copyIndex())]",
+      "copy": {
+        "name": "nicLoop",
+        "count": "[variables('numberOfWinInstances')]"
+      },
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "WinNetworkInterface"
+      },
+      "dependsOn": [
+        "[concat(resourceId('Microsoft.Network/publicIPAddresses/', variables('publicIPAddressName')), copyIndex())]",
+        "[resourceId('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+      ],
+      "properties": {
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('windowsNSG'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[concat(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddressName')), copyIndex())]"
+              },
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[concat(variables('vmName'), copyIndex())]",
+      "copy": {
+        "name": "vmLoop",
+        "count": "[variables('numberOfWinInstances')]"
+      },
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualMachine"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/', variables('vhdStorageAccountName'))]",
+        "[concat(resourceId('Microsoft.Network/networkInterfaces/', variables('nicName')), copyIndex())]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[concat(variables('vmName'), copyIndex())]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imagePublisher')]",
+            "offer": "[variables('imageOffer')]",
+            "sku": "[parameters('windowsOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[concat(reference(resourceId('Microsoft.Storage/storageAccounts', variables('vhdStorageAccountName')), '2016-01-01').primaryEndpoints.blob, variables('vhdStorageContainerName'), '/', variables('OSDiskName'), copyIndex(), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[concat(resourceId('Microsoft.Network/networkInterfaces', variables('nicName')), copyIndex())]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('vhdStorageAccountName')), '2016-01-01').primaryEndpoints.blob]"
+          }
+        }
+      },
+      "resources": [
+
+      ]
+    },
+    {
+      "name": "[concat(variables('UbuntuNicName'), copyIndex())]",
+      "copy": {
+        "name": "linNICLoop",
+        "count": "[variables('numberOfLinInstances')]"
+      },
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+        "[concat(resourceId('Microsoft.Network/publicIPAddresses', variables('linPubIpName')), copyIndex())]"
+      ],
+      "tags": {
+        "displayName": "UbuntuNic"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('UbuntuSubnetRef')]"
+              },
+              "publicIPAddress": {
+                "id": "[concat(resourceId('Microsoft.Network/publicIPAddresses', variables('linPubIpName')), copyIndex())]"
+              }
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('linuxNSG'))]"
+        }
+      }
+    },
+    {
+      "name": "[concat(variables('UbuntuName'), copyIndex())]",
+      "copy": {
+        "name": "linVmLoop",
+        "count": "[variables('numberOfLinInstances')]"
+      },
+      "type": "Microsoft.Compute/virtualMachines",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('vhdStorageAccountName'))]",
+        "[concat(resourceId('Microsoft.Network/networkInterfaces', variables('UbuntuNicName')), copyIndex())]"
+      ],
+      "tags": {
+        "displayName": "Ubuntu"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('UbuntuVmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[variables('UbuntuName')]",
+          "adminUsername": "[parameters('UbuntuAdminUsername')]",
+          "adminPassword": "[parameters('UbuntuAdminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('UbuntuImagePublisher')]",
+            "offer": "[variables('UbuntuImageOffer')]",
+            "sku": "[parameters('UbuntuUbuntuOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "UbuntuOSDisk",
+            "vhd": {
+              "uri": "[concat(reference(resourceId('Microsoft.Storage/storageAccounts', variables('vhdStorageAccountName')), '2016-01-01').primaryEndpoints.blob, variables('UbuntuStorageAccountContainerName'), '/', variables('UbuntuOSDiskName'), copyIndex(), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[concat(resourceId('Microsoft.Network/networkInterfaces', variables('UbuntuNicName')), copyIndex())]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "[concat(variables('linPubIpName'), copyIndex())]",
+      "copy": {
+        "name": "linVmPubIP",
+        "count": "[variables('numberOfLinInstances')]"
+      },
+      "type": "Microsoft.Network/publicIPAddresses",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [],
+      "tags": {
+        "displayName": "linPubIp"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic",
+        "dnsSettings": {
+          "domainNameLabel": "[concat(parameters('linPubIpDnsName'), copyIndex())]"
+        }
+      }
+    },
+    {
+      "name": "[variables('regStorageAccountName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-01-01",
+      "sku": {
+        "name": "[variables('regStorageType')]"
+      },
+      "dependsOn": [],
+      "tags": {
+        "displayName": "RegStorageAccount"
+      },
+      "kind": "Storage"
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[variables('windowsNSG')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NSG - Windows"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "rdp-rule",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "ssl-rule",
+            "properties": {
+              "description": "Allow SSL",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "dokcer-rule",
+            "properties": {
+              "description": "Allow Docker",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8000-8100",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 120,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[variables('linuxNSG')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NSG - Linux"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "ssh-rule",
+            "properties": {
+              "description": "Allow SSH",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "ssl-rule",
+            "properties": {
+              "description": "Allow SSL",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "dokcer-rule",
+            "properties": {
+              "description": "Allow Docker",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8000-8100",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 120,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
