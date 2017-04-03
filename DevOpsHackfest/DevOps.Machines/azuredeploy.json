@@ -403,16 +403,58 @@
             }
           },
           {
-            "name": "dokcer-rule",
+            "name": "swarm-nodes-rule",
             "properties": {
-              "description": "Allow Docker",
+              "description": "Allow Swarm Nodes",
               "protocol": "Tcp",
               "sourcePortRange": "*",
-              "destinationPortRange": "8000-8100",
+              "destinationPortRange": "2377",
               "sourceAddressPrefix": "Internet",
               "destinationAddressPrefix": "*",
               "access": "Allow",
               "priority": 120,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "swarm-overlay-rule-01",
+            "properties": {
+              "description": "Allow Swarm Overlay Networking",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "4789",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 130,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "swarm-overlay-rule-02",
+            "properties": {
+              "description": "Allow Swarm Overlay Networking",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "7946",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 140,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "tls-proxy-rule",
+            "properties": {
+              "description": "Allow TLS Proxy Access to Swarm",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "12376",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 150,
               "direction": "Inbound"
             }
           }
@@ -458,16 +500,72 @@
             }
           },
           {
-            "name": "dokcer-rule",
+            "name": "swarm-manager-rule",
             "properties": {
-              "description": "Allow Docker",
+              "description": "Allow Swarm Manager",
               "protocol": "Tcp",
               "sourcePortRange": "*",
-              "destinationPortRange": "8000-8100",
+              "destinationPortRange": "2376",
               "sourceAddressPrefix": "Internet",
               "destinationAddressPrefix": "*",
               "access": "Allow",
               "priority": 120,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "swarm-nodes-rule",
+            "properties": {
+              "description": "Allow Swarm Nodes",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "2377",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 130,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "swarm-overlay-rule-01",
+            "properties": {
+              "description": "Allow Swarm Overlay Networking",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "4789",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 140,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "swarm-overlay-rule-02",
+            "properties": {
+              "description": "Allow Swarm Overlay Networking",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "7946",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 150,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "tls-proxy-rule",
+            "properties": {
+              "description": "Allow TLS Proxy Access to Swarm",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "12376-12389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 160,
               "direction": "Inbound"
             }
           }
